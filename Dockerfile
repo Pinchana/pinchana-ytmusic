@@ -11,7 +11,7 @@ COPY pinchana-core/pyproject.toml pinchana-core/uv.lock pinchana-core/README.md 
 RUN mkdir -p ../pinchana-core/src
 COPY pinchana-core/src ../pinchana-core/src
 
-COPY pinchana-ytmusic/pyproject.toml pinchana-ytmusic/uv.lock pinchana-ytmusic/README.md ./
+COPY pinchana-ytmusic/pyproject.toml pinchana-ytmusic/README.md ./
 RUN uv sync --frozen --no-install-project
 
 COPY pinchana-ytmusic/src ./src
