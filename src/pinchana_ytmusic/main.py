@@ -12,7 +12,7 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from yt_dlp import YoutubeDL
 
 from pinchana_core.models import ScrapeRequest, ScrapeResponse
-from pinchana_core.music import MusicDownloader, MusicDownloadError
+from pinchana_core.music import MusicDownloader, MusicDownloadError, RateLimitError
 from pinchana_core.plugins import ScraperPlugin, registry
 from pinchana_core.storage import MediaStorage
 from pinchana_core.vpn import GluetunController, VpnRotationError
@@ -40,10 +40,15 @@ class YTMusicDownloader(MusicDownloader):
             "noplaylist": True,
             "proxy": proxy,
         }
-        info = await loop.run_in_executor(
-            None,
-            lambda: self._extract_info(url, opts),
-        )
+        try:
+            info = await loop.run_in_executor(
+                None,
+                lambda: self._extract_info(url, opts),
+            )
+        except Exception as e:
+            if any(s in str(e).lower() for s in ("403", "429", "rate limit", "too many requests", "timeout", "timed out", "connection", "blocked")):
+                raise RateLimitError(f"YT Music extract blocked: {e}")
+            raise MusicDownloadError(f"YT Music extract failed: {e}")
         if not info:
             raise MusicDownloadError("Could not extract YouTube Music info")
 
@@ -68,7 +73,7 @@ class YTMusicDownloader(MusicDownloader):
             return ydl.sanitize_info(ydl.extract_info(url, download=False))
 
 
-ytm_downloader = YTMusicDownloader(storage.base_path, proxy=proxy)
+ytm_downloader = YTMusicDownloader(storage.base_path, proxy=proxy, gluetun=gluetun)
 
 
 @router.post("/scrape", response_model=ScrapeResponse)
