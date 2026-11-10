@@ -73,11 +73,18 @@ class YTMusicDownloader(MusicDownloader):
             return ydl.sanitize_info(ydl.extract_info(url, download=False))
 
 
-ytm_downloader = YTMusicDownloader(storage.base_path, proxy=proxy, gluetun=gluetun)
+ytm_downloader = YTMusicDownloader(lambda: storage.base_path, proxy=proxy, gluetun=gluetun)
 
 
 @router.post("/scrape", response_model=ScrapeResponse)
 async def process_scrape_request(request: ScrapeRequest):
+    # singleflight includes the request cache scope, isolating different users.
+    return await storage.singleflight(
+        str(request.url), lambda: _process_scrape_request(request)
+    )
+
+
+async def _process_scrape_request(request: ScrapeRequest):
     url = str(request.url)
     if not re.match(r"(?:https?://)?(music\.)?youtube\.com/watch\?v=[\w-]+", url):
         raise HTTPException(status_code=400, detail="Invalid YouTube Music URL")
